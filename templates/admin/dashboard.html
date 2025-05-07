@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Gym Management System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-container {
+        padding: 20px;
+    }
+    .welcome-card {
+        background: linear-gradient(45deg, #0d6efd, #0a58ca);
+        color: white;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 30px;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+    .welcome-card h2 {
+        font-size: 2rem;
+        margin-bottom: 10px;
+    }
+    .welcome-card p {
+        margin-bottom: 0;
+        opacity: 0.9;
+    }
+    .stats-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        transition: transform 0.2s;
+    }
+    .stats-card:hover {
+        transform: translateY(-5px);
+    }
+    .stats-card .icon {
+        font-size: 2.5rem;
+        margin-bottom: 15px;
+        color: #0d6efd;
+    }
+    .stats-card h3 {
+        font-size: 1.8rem;
+        margin-bottom: 10px;
+        color: #343a40;
+    }
+    .stats-card p {
+        margin-bottom: 0;
+        color: #6c757d;
+        font-size: 1.1rem;
+    }
+    .chart-container {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 30px;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+    .chart-container h4 {
+        color: #343a40;
+        margin-bottom: 20px;
+        font-size: 1.3rem;
+    }
+    .alert {
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Welcome Card -->
+    <div class="welcome-card">
+        <h2>Welcome, {{ session.username }}!</h2>
+        <p>You are logged in as an Administrator. Here's an overview of your gym's performance.</p>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-info">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Stats Cards -->
+    <div class="row">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h3>{{ stats.total_members }}</h3>
+                <p>Total Members</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="icon">
+                    <i class="fas fa-user-tie"></i>
+                </div>
+                <h3>{{ stats.total_receptionists }}</h3>
+                <p>Total Staff</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="icon">
+                    <i class="fas fa-box"></i>
+                </div>
+                <h3>{{ stats.total_packages }}</h3>
+                <p>Active Packages</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="icon">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <h3>Rs. {{ "%.2f"|format(stats.revenue_from_memberships) }}</h3>
+                <p>Revenue from Memberships</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 1 -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4><i class="fas fa-chart-line me-2"></i>Monthly Revenue Trend</h4>
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4><i class="fas fa-chart-bar me-2"></i>Member Growth</h4>
+                <canvas id="membersChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 2 -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4><i class="fas fa-chart-pie me-2"></i>Package Distribution</h4>
+                <canvas id="packagesChart"></canvas>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4><i class="fas fa-calendar-check me-2"></i>Attendance Overview</h4>
+                <canvas id="attendanceChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Revenue Chart
+    const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    new Chart(revenueCtx, {
+        type: 'line',
+        data: {
+            labels: {{ revenue_labels|tojson }},
+            datasets: [{
+                label: 'Monthly Revenue',
+                data: {{ revenue_data|tojson }},
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'Rs. ' + value;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Members Chart
+    const membersCtx = document.getElementById('membersChart').getContext('2d');
+    new Chart(membersCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ member_labels|tojson }},
+            datasets: [{
+                label: 'New Members',
+                data: {{ member_data|tojson }},
+                backgroundColor: '#0d6efd',
+                borderRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+
+    // Packages Chart
+    const packagesCtx = document.getElementById('packagesChart').getContext('2d');
+    new Chart(packagesCtx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ package_labels|tojson }},
+            datasets: [{
+                data: {{ package_data|tojson }},
+                backgroundColor: [
+                    '#0d6efd',
+                    '#6610f2',
+                    '#6f42c1',
+                    '#d63384',
+                    '#dc3545'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'right',
+                }
+            }
+        }
+    });
+
+    // Attendance Chart
+    const attendanceCtx = document.getElementById('attendanceChart').getContext('2d');
+    new Chart(attendanceCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ attendance_labels|tojson }},
+            datasets: [{
+                label: 'Member Attendance',
+                data: {{ attendance_data|tojson }},
+                backgroundColor: '#0d6efd',
+                borderRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

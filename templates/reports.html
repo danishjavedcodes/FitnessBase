@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Month Selector and Download Button -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-2xl font-bold">Reports</h2>
+        <div class="d-flex gap-3 align-items-center">
+            <form method="get" action="{{ url_for('reports') }}" class="d-flex gap-3 align-items-center m-0">
+                <div class="input-group">
+                    <input type="month" 
+                           name="date" 
+                           value="{{ selected_date }}"
+                           class="form-control" 
+                           onchange="this.form.submit()">
+                </div>
+                <a href="{{ url_for('reports', date=selected_date, download=true) }}" 
+                   class="btn btn-primary">
+                    Download Report
+                </a>
+            </form>
+        </div>
+    </div>
+
+    <!-- Rest of the reports content -->
+    <!-- Revenue Summary -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Membership Revenue</h5>
+                    <h3 class="card-text text-primary">Rs. {{ monthly_revenue }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Sales Revenue</h5>
+                    <h3 class="card-text text-success">Rs. {{ monthly_sales_revenue }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Total Revenue</h5>
+                    <h3 class="card-text text-dark">Rs. {{ total_revenue }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rest of the tables remain the same -->
+    <!-- Staff Attendance Section -->
+    <div class="mb-4">
+        <h3>Staff Attendance</h3>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Staff Name</th>
+                        <th>Check In</th>
+                        <th>Check Out</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in staff_attendance_details %}
+                    <tr>
+                        <td>{{ record.date }}</td>
+                        <td>{{ record.staff_name }}</td>
+                        <td>{{ record.check_in }}</td>
+                        <td>{{ record.check_out }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Member Attendance Section -->
+    <div class="mb-4">
+        <h3>Member Attendance</h3>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Member Name</th>
+                        <th>Check In</th>
+                        <th>Check Out</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in member_attendance_details %}
+                    <tr>
+                        <td>{{ record.date }}</td>
+                        <td>{{ record.member_name }}</td>
+                        <td>{{ record.check_in }}</td>
+                        <td>{{ record.check_out }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Sales Section -->
+    <div class="mb-4">
+        <div class="sales-section">
+            <h3>Sales Details</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Items/Products</th>
+                        <th>Total Amount</th>
+                        <th>Payment Method</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sale in sales_details %}
+                    <tr>
+                        <td>{{ sale.date }}</td>
+                        <td style="white-space: pre-line">{{ sale.items_display }}</td>
+                        <td>Rs. {{ sale.total_amount }}</td>
+                        <td>{{ sale.payment_method }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+<!-- Add this section before the staff attendance table -->
+<div class="row mb-4">
+    <!-- Staff vs Member Attendance Chart -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Daily Attendance Comparison</h5>
+                <canvas id="attendanceChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Revenue Distribution Chart -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Revenue Distribution</h5>
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Package Distribution Chart -->
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Package Distribution</h5>
+                <canvas id="packageChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this before closing body tag -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Attendance Comparison Chart
+    new Chart(document.getElementById('attendanceChart'), {
+        type: 'line',
+        data: {
+            labels: {{ chart_data.staff_attendance.labels|tojson }},
+            datasets: [{
+                label: 'Staff Attendance',
+                data: {{ chart_data.staff_attendance.data|tojson }},
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            },
+            {
+                label: 'Member Attendance',
+                data: {{ chart_data.member_attendance.data|tojson }},
+                borderColor: 'rgb(255, 99, 132)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Attendees'
+                    }
+                }
+            }
+        }
+    });
+
+    // Revenue Distribution Chart
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'doughnut',
+        data: {
+            labels: {{ chart_data.revenue.labels|tojson }},
+            datasets: [{
+                data: {{ chart_data.revenue.data|tojson }},
+                backgroundColor: [
+                    'rgb(54, 162, 235)',
+                    'rgb(255, 99, 132)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
+    // Package Distribution Chart
+    new Chart(document.getElementById('packageChart'), {
+        type: 'bar',
+        data: {
+            labels: {{ chart_data.packages.labels|tojson }},
+            datasets: [{
+                label: 'Number of Members',
+                data: {{ chart_data.packages.data|tojson }},
+                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                borderColor: 'rgb(75, 192, 192)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Members'
+                    }
+                }
+            }
+        }
+    });
+});
+</script>

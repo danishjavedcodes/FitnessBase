@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .dashboard-container {
+        max-width: 900px;
+        margin: 40px auto 0 auto;
+        padding: 0 16px;
+    }
+    .welcome-card {
+        background: linear-gradient(90deg, #2563eb 0%, #1e40af 100%);
+        color: #fff;
+        border-radius: 12px;
+        padding: 32px 24px 24px 24px;
+        margin-bottom: 32px;
+        box-shadow: 0 2px 8px rgba(30,64,175,0.08);
+        text-align: center;
+    }
+    .stats-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px;
+        justify-content: center;
+    }
+    .stat-card {
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        padding: 28px 32px;
+        min-width: 220px;
+        text-align: center;
+        margin-bottom: 16px;
+        flex: 1 1 220px;
+        max-width: 300px;
+    }
+    .stat-title {
+        font-size: 1.1rem;
+        color: #374151;
+        margin-bottom: 8px;
+        font-weight: 600;
+    }
+    .stat-value {
+        font-size: 2.1rem;
+        font-weight: 700;
+        color: #2563eb;
+        margin-bottom: 12px;
+    }
+    .stat-btn {
+        background: #2563eb;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 18px;
+        font-size: 1rem;
+        font-weight: 500;
+        transition: background 0.2s;
+        text-decoration: none;
+        display: inline-block;
+    }
+    .stat-btn:hover {
+        background: #1e40af;
+        color: #fff;
+    }
+    @media (max-width: 900px) {
+        .stats-row { flex-direction: column; align-items: center; }
+        .stat-card { width: 100%; max-width: 100%; }
+    }
+</style>
+
+<div class="dashboard-container">
+    <div class="welcome-card">
+        <h2>Welcome, {{ staff.name }}!</h2>
+        <p>You are logged in as <b>Staff</b>.</p>
+    </div>
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-title">Total Members</div>
+            <div class="stat-value">{{ stats.total_members }}</div>
+            <a href="{{ url_for('view_members') }}" class="stat-btn">View Members</a>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Monthly Revenue</div>
+            <div class="stat-value">Rs. {{ stats.monthly_revenue }}</div>
+            <a href="{{ url_for('reports') }}" class="stat-btn">View Reports</a>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Available Packages</div>
+            <div class="stat-value">{{ stats.total_packages }}</div>
+            <a href="{{ url_for('packages') }}" class="stat-btn">View Packages</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

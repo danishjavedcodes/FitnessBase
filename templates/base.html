@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Fitness Base{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .sidebar {
+            min-height: 100vh;
+            background-color: #343a40;
+            padding-top: 20px;
+            position: fixed;
+            width: 250px;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        .sidebar.collapsed {
+            margin-left: -250px;
+        }
+        .sidebar a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 15px;
+            display: block;
+            transition: all 0.3s;
+        }
+        .sidebar a:hover {
+            background-color: #495057;
+            color: #fff;
+        }
+        .sidebar a.active {
+            background-color: #0d6efd;
+        }
+        .content {
+            margin-left: 250px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        .content.expanded {
+            margin-left: 0;
+        }
+        .card {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            margin-bottom: 20px;
+            border: none;
+        }
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid rgba(0,0,0,.125);
+        }
+        .navbar {
+            margin-left: 250px;
+            background-color: #fff !important;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            transition: all 0.3s ease;
+        }
+        .navbar.expanded {
+            margin-left: 0;
+        }
+        .navbar-brand {
+            color: #343a40 !important;
+        }
+        .nav-link {
+            color: #343a40 !important;
+        }
+        .welcome-card {
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .btn-primary:hover {
+            background-color: #0b5ed7;
+            border-color: #0a58ca;
+        }
+        .alert {
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .navbar-toggler {
+            border: none;
+            padding: 0.5rem;
+            font-size: 1.25rem;
+            line-height: 1;
+            background-color: transparent;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .navbar-toggler:hover {
+            color: #0d6efd;
+        }
+        .navbar-toggler i {
+            transition: transform 0.3s ease;
+        }
+        .navbar-toggler.collapsed i {
+            transform: rotate(0deg);
+        }
+        .navbar-toggler:not(.collapsed) i {
+            transform: rotate(180deg);
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                margin-left: -250px;
+            }
+            .sidebar.show {
+                margin-left: 0;
+            }
+            .content, .navbar {
+                margin-left: 0;
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% if session.user_type %}
+    <div class="sidebar" id="sidebar">
+        <h3 class="text-white text-center mb-4">
+            <i class="fas fa-dumbbell me-2"></i>Fitness Base
+        </h3>
+        <a href="{{ url_for('admin_dashboard' if session.user_type == 'admin' else 'staff_dashboard') }}" class="{{ 'active' if request.endpoint in ['admin_dashboard', 'staff_dashboard'] }}">
+            <i class="fas fa-home me-2"></i>Dashboard
+        </a>
+        
+        {% if session.user_type == 'admin' or 'members' in session.get('privileges', []) %}
+        <a href="{{ url_for('view_members') }}" class="{{ 'active' if request.endpoint == 'view_members' }}">
+            <i class="fas fa-users me-2"></i>{{ 'Manage Members' if session.user_type == 'admin' else 'View Members' }}
+        </a>
+        {% endif %}
+
+        {% if session.user_type == 'admin' or 'member_attendance' in session.get('privileges', []) %}
+        <a href="{{ url_for('attendance') }}" class="{{ 'active' if request.endpoint == 'attendance' }}">
+            <i class="fas fa-calendar-check me-2"></i>Member Attendance
+        </a>
+        {% endif %}
+
+        {% if session.user_type == 'admin' or 'staff_attendance' in session.get('privileges', []) %}
+        <a href="{{ url_for('staff_attendance') }}" class="{{ 'active' if request.endpoint == 'staff_attendance' }}">
+            <i class="fas fa-user-clock me-2"></i>Staff Attendance
+        </a>
+        {% endif %}
+
+        {% if session.user_type == 'admin' or 'packages' in session.get('privileges', []) %}
+        <a href="{{ url_for('packages') }}" class="{{ 'active' if request.endpoint == 'packages' }}">
+            <i class="fas fa-box me-2"></i>{{ 'Manage Packages' if session.user_type == 'admin' else 'View Packages' }}
+        </a>
+        {% endif %}
+
+        {% if session.user_type == 'admin' or 'staff' in session.get('privileges', []) %}
+        <a href="{{ url_for('manage_receptionists') }}" class="{{ 'active' if request.endpoint == 'manage_receptionists' }}">
+            <i class="fas fa-user-tie me-2"></i>Manage Staff
+        </a>
+        {% endif %}
+
+        {% if session.user_type == 'admin' or 'inventory' in session.get('privileges', []) %}
+        <a href="{{ url_for('inventory') }}" class="{{ 'active' if request.endpoint == 'inventory' }}">
+            <i class="fas fa-warehouse me-2"></i>Manage Inventory
+        </a>
+        {% endif %}
+
+        {% if session.user_type == 'admin' or 'sales' in session.get('privileges', []) %}
+        <a href="{{ url_for('sales') }}" class="{{ 'active' if request.endpoint == 'sales' }}">
+            <i class="fas fa-shopping-cart me-2"></i>Manage Sales
+        </a>
+        {% endif %}
+
+        {% if session.user_type == 'admin' or 'payments' in session.get('privileges', []) %}
+        <a href="{{ url_for('payments') }}" class="{{ 'active' if request.endpoint == 'payments' }}">
+            <i class="fas fa-money-bill-wave me-2"></i>View Payments
+        </a>
+        {% endif %}
+
+        {% if session.user_type == 'admin' or 'reports' in session.get('privileges', []) %}
+        <a href="{{ url_for('reports') }}" class="{{ 'active' if request.endpoint == 'reports' }}">
+            <i class="fas fa-chart-bar me-2"></i>View Reports
+        </a>
+        {% endif %}
+
+        <a href="{{ url_for('change_password') }}" class="{{ 'active' if request.endpoint == 'change_password' }}">
+            <i class="fas fa-key me-2"></i>Change Password
+        </a>
+        
+        <a href="{{ url_for('logout') }}">
+            <i class="fas fa-sign-out-alt me-2"></i>Logout
+        </a>
+    </div>
+
+    <nav class="navbar navbar-expand-lg navbar-light">
+        <div class="container-fluid">
+            <button class="navbar-toggler collapsed" type="button" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <span class="navbar-text ms-3">
+                <i class="fas fa-user me-2"></i>{{ session.username }}
+            </span>
+        </div>
+    </nav>
+    {% endif %}
+
+    <div class="content" id="content">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-info">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            const content = document.getElementById('content');
+            const navbar = document.querySelector('.navbar');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            
+            // Check for saved state
+            const isSidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            if (isSidebarCollapsed) {
+                sidebar.classList.add('collapsed');
+                content.classList.add('expanded');
+                navbar.classList.add('expanded');
+                sidebarToggle.classList.remove('collapsed');
+            }
+
+            sidebarToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('collapsed');
+                content.classList.toggle('expanded');
+                navbar.classList.toggle('expanded');
+                sidebarToggle.classList.toggle('collapsed');
+                
+                // Save state
+                localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+            });
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
