@@ -148,12 +148,6 @@
                 <canvas id="packagesChart"></canvas>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="chart-container">
-                <h4><i class="fas fa-calendar-check me-2"></i>Attendance Overview</h4>
-                <canvas id="attendanceChart"></canvas>
-            </div>
-        </div>
     </div>
 </div>
 {% endblock %}
@@ -250,37 +244,6 @@ document.addEventListener('DOMContentLoaded', function() {
             plugins: {
                 legend: {
                     position: 'right',
-                }
-            }
-        }
-    });
-
-    // Attendance Chart
-    const attendanceCtx = document.getElementById('attendanceChart').getContext('2d');
-    new Chart(attendanceCtx, {
-        type: 'bar',
-        data: {
-            labels: {{ attendance_labels|tojson }},
-            datasets: [{
-                label: 'Member Attendance',
-                data: {{ attendance_data|tojson }},
-                backgroundColor: '#0d6efd',
-                borderRadius: 5
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'top',
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1
-                    }
                 }
             }
         }

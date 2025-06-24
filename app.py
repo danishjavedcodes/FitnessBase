@@ -83,12 +83,25 @@ def admin_dashboard():
         return redirect(url_for('login'))
     
     try:
-        # Load all required DataFrames
-        members_df = pd.DataFrame(spreadsheet.worksheet('members').get_all_records())
-        receptionists_df = pd.DataFrame(spreadsheet.worksheet('receptionists').get_all_records())
-        packages_df = pd.DataFrame(spreadsheet.worksheet('packages').get_all_records())
-        payments_df = pd.DataFrame(spreadsheet.worksheet('payments').get_all_records())
-        attendance_df = pd.DataFrame(spreadsheet.worksheet('attendance').get_all_records())
+        # Load all required DataFrames using the read_sheet helper function
+        members_df = read_sheet('members')
+        receptionists_df = read_sheet('receptionists')
+        packages_df = read_sheet('packages')
+        payments_df = read_sheet('payments')
+        
+        # Try to load attendance data, create empty DataFrame if it doesn't exist
+        try:
+            attendance_df = read_sheet('attendance')
+        except Exception as e:
+            app.logger.warning(f"Attendance sheet not found or empty: {str(e)}")
+            attendance_df = pd.DataFrame(columns=['date', 'member_id', 'member_name', 'check_in', 'check_out'])
+        
+        # Try to load sales data
+        try:
+            sales_df = read_sheet('sales')
+        except Exception as e:
+            app.logger.warning(f"Sales sheet not found or empty: {str(e)}")
+            sales_df = pd.DataFrame(columns=['date', 'total_amount'])
         
         app.logger.debug(f"Members DataFrame: {members_df}")
         app.logger.debug(f"Payments DataFrame: {payments_df}")
@@ -103,16 +116,23 @@ def admin_dashboard():
         }
         
         # Calculate monthly revenue from payments
-        if 'date' in payments_df.columns:
-            current_month = datetime.now().strftime('%B')
-            monthly_payments = payments_df[payments_df['date'].str.contains(current_month, na=False)]
+        if not payments_df.empty and 'date' in payments_df.columns:
+            # Use consistent date filtering for current month
+            current_month_num = datetime.now().month
+            current_year = datetime.now().year
+            
+            # Convert date column to datetime for proper filtering
+            payments_df['date'] = pd.to_datetime(payments_df['date'], format='%d-%m-%Y', errors='coerce')
+            monthly_payments = payments_df[
+                (payments_df['date'].dt.month == current_month_num) &
+                (payments_df['date'].dt.year == current_year)
+            ]
             payments_revenue = monthly_payments['amount'].sum() if 'amount' in monthly_payments.columns else 0
         else:
             payments_revenue = 0
 
         # Calculate monthly revenue from sales
-        sales_df = pd.DataFrame(spreadsheet.worksheet('sales').get_all_records())
-        if 'date' in sales_df.columns:
+        if not sales_df.empty and 'date' in sales_df.columns:
             # Convert date to datetime for filtering
             sales_df['date'] = pd.to_datetime(sales_df['date'], errors='coerce')
             current_month_num = datetime.now().month
@@ -125,15 +145,16 @@ def admin_dashboard():
         else:
             sales_revenue = 0
 
-        # Calculate revenue from memberships for the current month
-        if 'date' in payments_df.columns and 'total' in payments_df.columns:
-            current_month = datetime.now().strftime('%m-%Y')
-            payments_df['date'] = payments_df['date'].astype(str)
-            monthly_payments = payments_df[payments_df['date'].str.endswith(current_month)]
+        # Calculate revenue from memberships for the current month (sum of 'total' column in payments sheet)
+        revenue_from_memberships = 0.0
+        if not payments_df.empty and 'date' in payments_df.columns and 'total' in payments_df.columns:
+            # Convert 'date' to datetime using the correct format
+            payments_df['date'] = pd.to_datetime(payments_df['date'], format='%d-%m-%Y', errors='coerce')
+            # Filter for current month and year
+            now = datetime.now()
+            monthly_payments = payments_df[(payments_df['date'].dt.month == now.month) & (payments_df['date'].dt.year == now.year)]
+            # Sum the 'total' column (already numeric)
             revenue_from_memberships = monthly_payments['total'].sum()
-        else:
-            revenue_from_memberships = 0.0
-
         stats['revenue_from_memberships'] = revenue_from_memberships
         
         # Combine both revenues
@@ -143,37 +164,70 @@ def admin_dashboard():
         revenue_data = []
         revenue_labels = []
         for i in range(5, -1, -1):
-            month = (datetime.now() - timedelta(days=30*i)).strftime('%B')
-            monthly_payments = payments_df[payments_df['date'].str.contains(month, na=False)]
-            revenue = monthly_payments['amount'].sum() if 'amount' in monthly_payments.columns else 0
+            # Calculate the month and year for each of the last 6 months
+            target_date = datetime.now() - timedelta(days=30*i)
+            target_month = target_date.month
+            target_year = target_date.year
+            month_name = target_date.strftime('%B')
+            
+            if not payments_df.empty and 'date' in payments_df.columns:
+                # Use datetime filtering for accurate month/year matching
+                if payments_df['date'].dtype == 'object':
+                    payments_df['date'] = pd.to_datetime(payments_df['date'], format='%d-%m-%Y', errors='coerce')
+                
+                monthly_payments = payments_df[
+                    (payments_df['date'].dt.month == target_month) &
+                    (payments_df['date'].dt.year == target_year)
+                ]
+                revenue = monthly_payments['total'].sum() if 'total' in monthly_payments.columns else 0
+            else:
+                revenue = 0
             revenue_data.append(revenue)
-            revenue_labels.append(month)
+            revenue_labels.append(month_name)
         
-        # Prepare data for member growth chart
+        # Prepare data for member growth chart (last 6 months)
         member_data = []
         member_labels = []
-        for i in range(5, -1, -1):
-            month = (datetime.now() - timedelta(days=30*i)).strftime('%B')
-            monthly_members = members_df[members_df['join_date'].str.contains(month, na=False)]
-            member_data.append(len(monthly_members))
-            member_labels.append(month)
+        if not members_df.empty and 'join_date' in members_df.columns:
+            # Convert join_date to datetime
+            members_df['join_date'] = pd.to_datetime(members_df['join_date'], format='%d-%m-%Y', errors='coerce')
+            for i in range(5, -1, -1):
+                target_date = datetime.now() - timedelta(days=30*i)
+                target_month = target_date.month
+                target_year = target_date.year
+                month_name = target_date.strftime('%B')
+                monthly_members = members_df[
+                    (members_df['join_date'].dt.month == target_month) &
+                    (members_df['join_date'].dt.year == target_year)
+                ]
+                member_data.append(len(monthly_members))
+                member_labels.append(month_name)
+        else:
+            for i in range(5, -1, -1):
+                member_data.append(0)
+                month_name = (datetime.now() - timedelta(days=30*i)).strftime('%B')
+                member_labels.append(month_name)
         
         # Prepare data for package distribution chart
         package_data = []
         package_labels = []
-        for _, package in packages_df.iterrows():
-            package_members = members_df[members_df['package'] == package['name']]
-            if len(package_members) > 0:
-                package_data.append(len(package_members))
-                package_labels.append(package['name'])
+        if not packages_df.empty and not members_df.empty:
+            for _, package in packages_df.iterrows():
+                package_members = members_df[members_df['package'] == package['name']]
+                if len(package_members) > 0:
+                    package_data.append(len(package_members))
+                    package_labels.append(package['name'])
         
         # Prepare data for attendance chart (last 7 days)
         attendance_data = []
         attendance_labels = []
         for i in range(6, -1, -1):
             date = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
-            daily_attendance = attendance_df[attendance_df['date'] == date]
-            attendance_data.append(len(daily_attendance))
+            if not attendance_df.empty and 'date' in attendance_df.columns:
+                daily_attendance = attendance_df[attendance_df['date'] == date]
+                attendance_data.append(len(daily_attendance))
+            else:
+                attendance_data.append(0)
             attendance_labels.append(date)
         
         # Convert all chart data to native Python types
@@ -202,7 +256,8 @@ def admin_dashboard():
                                  'total_members': 0,
                                  'total_receptionists': 0,
                                  'total_packages': 0,
-                                 'revenue_from_memberships': 0.0
+                                 'revenue_from_memberships': 0.0,
+                                 'monthly_revenue': 0
                              },
                              revenue_data=[],
                              revenue_labels=[],
@@ -220,10 +275,24 @@ def staff_dashboard():
         return redirect(url_for('login'))
     
     try:
-        # Get statistics for the dashboard
-        members_df = read_sheet('members')
-        packages_df = read_sheet('packages')
-        payments_df = read_sheet('payments')
+        # Get statistics for the dashboard with error handling
+        try:
+            members_df = read_sheet('members')
+        except Exception as e:
+            app.logger.warning(f"Error loading members: {str(e)}")
+            members_df = pd.DataFrame()
+            
+        try:
+            packages_df = read_sheet('packages')
+        except Exception as e:
+            app.logger.warning(f"Error loading packages: {str(e)}")
+            packages_df = pd.DataFrame()
+            
+        try:
+            payments_df = read_sheet('payments')
+        except Exception as e:
+            app.logger.warning(f"Error loading payments: {str(e)}")
+            payments_df = pd.DataFrame()
         
         # Calculate monthly revenue
         current_month = datetime.now().strftime('%m-%Y')
@@ -231,7 +300,7 @@ def staff_dashboard():
             # Convert date column to string if it's not already
             payments_df['date'] = payments_df['date'].astype(str)
             monthly_payments = payments_df[payments_df['date'].str.endswith(current_month)]
-            monthly_revenue = monthly_payments['amount'].sum() if not monthly_payments.empty else 0
+            monthly_revenue = monthly_payments['amount'].sum() if not monthly_payments.empty and 'amount' in monthly_payments.columns else 0
         else:
             monthly_revenue = 0
         
@@ -244,8 +313,13 @@ def staff_dashboard():
         return render_template('staff_dashboard.html', stats=stats)
     except Exception as e:
         app.logger.error(f"Error loading staff dashboard: {str(e)}")
-        flash('Error loading dashboard data')
-        return redirect(url_for('login'))
+        # Return default stats instead of redirecting
+        return render_template('staff_dashboard.html', 
+                             stats={
+                                 'total_members': 0,
+                                 'total_packages': 0,
+                                 'monthly_revenue': 0
+                             })
 
 @app.route('/logout')
 def logout():
@@ -342,7 +416,7 @@ def setup_google_sheets():
         # }
 
         service_account_dict = generate_service_account_dict()
-        print(service_account_dict)
+        # print(service_account_dict)
         
         try:
             # Create credentials from dictionary
@@ -376,12 +450,36 @@ spreadsheet = setup_google_sheets()
 
 # Helper functions for reading and writing to sheets
 def read_sheet(sheet_name):
-    worksheet = spreadsheet.worksheet(sheet_name)
-    return get_as_dataframe(worksheet)
+    try:
+        worksheet = spreadsheet.worksheet(sheet_name)
+        df = get_as_dataframe(worksheet)
+        # Handle empty worksheets
+        if df.empty:
+            app.logger.warning(f"Sheet '{sheet_name}' is empty")
+        return df
+    except gspread.exceptions.WorksheetNotFound:
+        app.logger.warning(f"Worksheet '{sheet_name}' not found")
+        return pd.DataFrame()
+    except Exception as e:
+        app.logger.error(f"Error reading sheet '{sheet_name}': {str(e)}")
+        return pd.DataFrame()
 
 def write_sheet(sheet_name, df):
-    worksheet = spreadsheet.worksheet(sheet_name)
-    set_with_dataframe(worksheet, df)
+    try:
+        worksheet = spreadsheet.worksheet(sheet_name)
+        set_with_dataframe(worksheet, df)
+    except gspread.exceptions.WorksheetNotFound:
+        # Create the worksheet if it doesn't exist
+        try:
+            worksheet = spreadsheet.add_worksheet(title=sheet_name, rows=1000, cols=20)
+            set_with_dataframe(worksheet, df)
+            app.logger.info(f"Created new worksheet '{sheet_name}'")
+        except Exception as e:
+            app.logger.error(f"Error creating worksheet '{sheet_name}': {str(e)}")
+            raise
+    except Exception as e:
+        app.logger.error(f"Error writing to sheet '{sheet_name}': {str(e)}")
+        raise
 
 # Example of how to modify a route to use Google Sheets
 @app.route('/view_members')
@@ -2111,12 +2209,35 @@ def handle_sheets_error(e):
 @app.route('/test-sheets')
 def test_sheets():
     try:
+        # Get list of all available worksheets
+        worksheets = spreadsheet.worksheets()
+        worksheet_names = [ws.title for ws in worksheets]
+        
         # Test reading from members sheet
         members_df = read_sheet('members')
+        
+        # Test reading from other key sheets
+        test_results = {}
+        for sheet_name in ['members', 'receptionists', 'packages', 'payments', 'attendance', 'sales', 'inventory', 'custom_products']:
+            try:
+                df = read_sheet(sheet_name)
+                test_results[sheet_name] = {
+                    'status': 'success',
+                    'rows': len(df),
+                    'columns': list(df.columns) if not df.empty else []
+                }
+            except Exception as e:
+                test_results[sheet_name] = {
+                    'status': 'error',
+                    'error': str(e)
+                }
+        
         return jsonify({
             'status': 'success',
             'message': 'Successfully connected to Google Sheets',
-            'sample_data': members_df.head().to_dict('records')
+            'available_worksheets': worksheet_names,
+            'test_results': test_results,
+            'sample_members_data': members_df.head().to_dict('records') if not members_df.empty else []
         })
     except Exception as e:
         return jsonify({
@@ -2135,6 +2256,107 @@ def get_staff_data():
         staff_cache['data'] = read_sheet('receptionists')
         staff_cache['timestamp'] = now
     return staff_cache['data']
+
+@app.route('/debug/revenue')
+def debug_revenue():
+    if 'user_type' not in session or session['user_type'] != 'admin':
+        flash('Access denied')
+        return redirect(url_for('login'))
+    
+    try:
+        payments_df = read_sheet('payments')
+        current_month_num = datetime.now().month
+        current_year = datetime.now().year
+        
+        # Create a copy for debugging
+        payments_df_copy = payments_df.copy()
+        
+        # Convert date column to datetime
+        if payments_df_copy['date'].dtype == 'object':
+            payments_df_copy['date'] = pd.to_datetime(payments_df_copy['date'], format='%d-%m-%Y', errors='coerce')
+        
+        # Filter for current month
+        monthly_payments = payments_df_copy[
+            (payments_df_copy['date'].dt.month == current_month_num) &
+            (payments_df_copy['date'].dt.year == current_year)
+        ]
+        
+        # Convert total to numeric
+        monthly_payments['total'] = pd.to_numeric(monthly_payments['total'], errors='coerce')
+        
+        # Calculate different sums
+        total_sum = monthly_payments['total'].sum()
+        total_sum_no_nan = monthly_payments['total'].dropna().sum()
+        
+        # Get all payments data for manual verification
+        all_payments = []
+        for idx, row in monthly_payments.iterrows():
+            all_payments.append({
+                'index': idx,
+                'date': row['date'],
+                'member_name': row.get('member_name', 'N/A'),
+                'total': row['total'],
+                'is_nan': pd.isna(row['total'])
+            })
+        
+        return jsonify({
+            'current_month': current_month_num,
+            'current_year': current_year,
+            'total_records': len(payments_df_copy),
+            'monthly_records': len(monthly_payments),
+            'total_sum': total_sum,
+            'total_sum_no_nan': total_sum_no_nan,
+            'nan_count': monthly_payments['total'].isna().sum(),
+            'all_payments': all_payments
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/verify/payments')
+def verify_payments():
+    if 'user_type' not in session or session['user_type'] != 'admin':
+        flash('Access denied')
+        return redirect(url_for('login'))
+    
+    try:
+        payments_df = read_sheet('payments')
+        
+        # Show basic info about the data
+        info = {
+            'total_rows': len(payments_df),
+            'columns': list(payments_df.columns),
+            'date_column_sample': payments_df['date'].head(10).tolist() if 'date' in payments_df.columns else [],
+            'total_column_sample': payments_df['total'].head(10).tolist() if 'total' in payments_df.columns else [],
+            'current_month': datetime.now().month,
+            'current_year': datetime.now().year
+        }
+        
+        # Show all payments for current month (raw data)
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        
+        current_month_payments = []
+        for idx, row in payments_df.iterrows():
+            try:
+                date_str = str(row['date'])
+                if date_str.endswith(f'-{current_month:02d}-{current_year}'):
+                    current_month_payments.append({
+                        'row': idx,
+                        'date': date_str,
+                        'member_name': row.get('member_name', 'N/A'),
+                        'total': row.get('total', 0)
+                    })
+            except:
+                continue
+        
+        info['current_month_payments'] = current_month_payments
+        info['current_month_count'] = len(current_month_payments)
+        
+        return jsonify(info)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 
