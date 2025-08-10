@@ -1576,34 +1576,25 @@ def reports():
 def generate_monthly_report(selected_date):
     try:
         year, month = map(int, selected_date.split('-'))
-        backup_file = os.path.join('data', 'gym_data_backup.xlsx')
-        
-        # Create a new Excel file for the report
+        # Use live Google Sheet data instead of backup
+        sheet_names = ['members', 'payments', 'attendance', 'trainer_attendance', 'sales', 'inventory', 'custom_products', 'packages', 'receptionists']
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            with pd.ExcelFile(backup_file) as xls:
-                for sheet_name in xls.sheet_names:
-                    df = pd.read_excel(xls, sheet_name)
-                    
-                    if 'date' in df.columns:
-                        # Convert date column to datetime
-                        df['date'] = pd.to_datetime(df['date'])
-                        # Filter data for selected month
+            for sheet_name in sheet_names:
+                try:
+                    df = read_sheet(sheet_name)
+                    # Only filter if there is a date column
+                    if not df.empty and 'date' in df.columns:
+                        df['date'] = pd.to_datetime(df['date'], format='%d-%m-%Y', errors='coerce')
                         month_mask = (df['date'].dt.month == month) & (df['date'].dt.year == year)
                         filtered_df = df[month_mask]
-                        
-                        # Convert date back to string format before saving
-                        if not filtered_df.empty:
-                            if sheet_name == 'Sales':
-                                filtered_df['date'] = filtered_df['date'].dt.strftime('%d-%m-%Y %H:%M:%S')
-                            else:
-                                filtered_df['date'] = filtered_df['date'].dt.strftime('%d-%m-%Y')
-                        
+                        # Convert date back to string for Excel
+                        filtered_df['date'] = filtered_df['date'].dt.strftime('%d-%m-%Y')
                         filtered_df.to_excel(writer, sheet_name=sheet_name, index=False)
                     else:
-                        # For sheets without dates, include all data
                         df.to_excel(writer, sheet_name=sheet_name, index=False)
-
+                except Exception as e:
+                    pd.DataFrame().to_excel(writer, sheet_name=sheet_name, index=False)
         output.seek(0)
         return send_file(
             output,
@@ -1611,7 +1602,6 @@ def generate_monthly_report(selected_date):
             as_attachment=True,
             download_name=f'gym_report_{selected_date}.xlsx'
         )
-        
     except Exception as e:
         app.logger.error(f"Error generating monthly report: {str(e)}")
         flash('Error generating report')

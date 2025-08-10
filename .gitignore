@@ -20,6 +20,7 @@ develop-eggs/
 dist/
 downloads/
 eggs/
+temp_auto_push.bat
 .eggs/
 lib/
 lib64/
@@ -36,10 +37,10 @@ ENV/
 
 # IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 
 # OS
 .DS_Store
-Thumbs.db 
+Thumbs.db .gitignore
+temp_interactive_push.bat
