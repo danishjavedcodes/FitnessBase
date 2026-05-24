@@ -5,8 +5,6 @@ service-account.json
 !package-lock.json
 
 # Environment variables
-.env
-.env.*
 
 # Python
 __pycache__/
@@ -44,3 +42,6 @@ ENV/
 .DS_Store
 Thumbs.db .gitignore
 temp_interactive_push.bat
+branch_structure.json
+config.bat
+node_modules
