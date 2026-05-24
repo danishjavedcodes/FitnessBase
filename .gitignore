@@ -44,3 +44,4 @@ ENV/
 .DS_Store
 Thumbs.db .gitignore
 temp_interactive_push.bat
+branch_structure.json
